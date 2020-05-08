@@ -1,5 +1,5 @@
 ---
-date: 2020-02-12
+date: 2020-05-09
 title: "StreamsLifecycleInterceptor"
 linkTitle: "The StreamsLifecycle Intercepting Chain"
 weight: 7
@@ -92,6 +92,8 @@ before the streams application is started.
 When enabled, the `AutoCreateTopicsInterceptor` is automatically configured by the `AzkarraContext`. 
 The `AzkarraContext` will use the following properties to configure the `AutoCreateTopicsInterceptor`.
 
+### 8.5.1 Configuration properties
+
 | Property                                | Type                | Description                                                         |
 |-----------------------------------------|-------------------- |---------------------------------------------------------------------|
 |  `auto.create.topics.enable`            |  boolean            | If `true`, creates all source and sink topics used by the topology. |
@@ -112,7 +114,7 @@ env.addStreamsLifecycleInterceptor( () -> {
 });
 ```
 
-### 8.5.1 Defining the list of Topics
+### 8.5.2 Defining the list of Topics
 
 By default, the `AutoCreateTopicsInterceptor` resolves the list of topics to be created from the `TopologyDescription` object.
 But, you can also specify your own list of `NewTopic` to be created.
@@ -145,7 +147,7 @@ public class TopicsFactory {
 }
 ```
 
-### 8.5.2 Automatically deleting topics
+### 8.5.3 Automatically deleting topics
 
 The `AutoCreateTopicsInterceptor` can also be used for automatically deleting any topics used by the topology when the streams instance is stopped.
 Note: This property should be used with care and not enable for production.
@@ -154,4 +156,134 @@ Note: This property should be used with care and not enable for production.
 |-----------------------------------------|-------------------- |---------------------------------------------------------------------|
 |  `auto.delete.topics.enable`            |  boolean            | If `true`, deletes all topics after the streams is stopped (should only be used for development) |
 
+## 8.6 MonitoringStreamsInterceptor
 
+As of Azkarra v0.7.0, you can configure the built-in `MonitoringStreamsInterceptor` to periodically publish a state event of your `KafkaStreams` instance directly into a Kafka topic (default: `_azkarra-streams-monitoring`).
+
+The `MonitoringStreamsInterceptor` can be enable by setting the global application property `azkarra.context.monitoring.streams.interceptor.enable` to true in
+your *application.conf* file
+
+### 8.6.1 The event format
+
+Azkarra emits the state of `KafkaStreams` instances in the form of events that adhere to the [CloudEvents](https://cloudevents.io/) specification.
+
+The CloudEvent specification is developped under the [Cloud Native Computing Foundation](https://cncf.io/) with the aim to describe a standardized and protocol-agnostic definition of the structure and metadata description of events. 
+
+Currently, Azkarra only supports the [Structuted Content](https://github.com/cloudevents/spec/blob/v1.0/kafka-protocol-binding.md#33-structured-content-mode) mode for mapping CloudEvents to Kafka message. That means that the message-value contains event metadata and data together in a single envelope, encoded in JSON.
+
+The following example shows a CloudEvent published by the `MonitoringStreamsInterceptor` using default configuration.
+
+```json
+{
+  "id": "appid:basic-word-count;appsrv:localhost:8082;ts:1588976019636", ①
+  "source": "azkarra/ks/localhost:8082",                                 ② 
+  "specversion": "1.0",                                                  ③
+  "type": "io.streamthoughts.azkarra.streams.stateupdateevent",          ④
+  "time": "2020-05-08T22:13:39.636+0000",                                ⑤
+  "datacontenttype": "application/json",                                 ⑥ 
+  "ioazkarramonitorintervalms": 10000,                                   ⑦
+  "ioazkarrastreamsappid": "basic-word-count",                           ⑧
+  "ioazkarraversion": "0.7.0-SNAPSHOT",                                  ⑨
+  "ioazkarrastreamsappserver": "localhost:8082"                          ⑩
+  "data": {                                                              ⑪
+    "state": "RUNNING",
+    "threads": [
+      {
+        "name": "basic-word-count-ab756b57-25ed-4c84-b4ef-93e9a84057ad-StreamThread-1",
+        "state": "RUNNING",
+        "active_tasks": [
+          {
+            "task_id": "0_0",
+            "topic_partitions": [
+              {
+                "topic": "streams-plaintext-input",
+                "partition": 0
+              }
+            ]
+          },
+          {
+            "task_id": "1_0",
+            "topic_partitions": [
+              {
+                "topic": "basic-word-count-count-repartition",
+                "partition": 0
+              }
+            ]
+          }
+        ],
+        "standby_tasks": [],
+        "clients": {
+          "admin_client_id": "basic-word-count-ab756b57-25ed-4c84-b4ef-93e9a84057ad-admin",
+          "consumer_client_id": "basic-word-count-ab756b57-25ed-4c84-b4ef-93e9a84057ad-StreamThread-1-consumer",
+          "producer_client_ids": [
+            "basic-word-count-ab756b57-25ed-4c84-b4ef-93e9a84057ad-StreamThread-1-producer"
+          ],
+          "restore_consumer_client_id": "basic-word-count-ab756b57-25ed-4c84-b4ef-93e9a84057ad-StreamThread-1-restore-consumer"
+        }
+      }
+    ],
+    "offsets": {
+      "group": "basic-word-count",
+      "consumers": [
+        {
+          "client_id": "basic-word-count-ab756b57-25ed-4c84-b4ef-93e9a84057ad-StreamThread-1-consumer",
+          "stream_thread": "basic-word-count-ab756b57-25ed-4c84-b4ef-93e9a84057ad-StreamThread-1",
+          "positions": [
+            {
+              "topic": "streams-plaintext-input",
+              "partition": 0,
+              "consumed_offset": 10,
+              "consumed_timestamp": 1588975991664,
+              "committed_offset": 11,
+              "committed_timestamp": 1588976019189,
+              "log_end_offset": 11,
+              "log_start_offset": 0,
+              "lag": 0
+            },
+            {
+              "topic": "basic-word-count-count-repartition",
+              "partition": 0,
+              "consumed_offset": 14,
+              "consumed_timestamp": 1588975991664,
+              "committed_offset": 15,
+              "committed_timestamp": 1588976019209,
+              "log_end_offset": 15,
+              "log_start_offset": 15,
+              "lag": 0
+            }
+          ]
+        }
+      ]
+    },
+    "state_changed_time": 1588975839528
+  }
+}
+```
+
+* **①** The unique id of the state change event, based on the application id, the application server and the Unix epoch
+* **②** The source of the event; i.e the application server.
+* **③** The CloudEvents specification versions
+* **④** The type of change state event
+* **⑤** Time of the state change or the event is emit
+* **⑥** The content type of the data attribute; i.e JSON
+* **⑦** The period the interceptor use to send a state change event for the current KafkaStream instance.
+* **⑧** The `application.id` property value attached the KafkaStreams instance.
+* **⑨** The version of Azkarra Streams
+* **⑩** The `application.server` property value attached the KafkaStreams instance.
+* **⑪** The actual state of KafkaStreams
+
+You can also add your on CloudEvent extension attributes by configuring the property `monitoring.streams.interceptor.ce.extensions`.
+
+{{% alert title="" color="info" %}}
+Note : Configuration options, the CloudEvent fields and there semantics etc, may change in future releases, based on the feedback we receive from the Azkarra users.
+{{% /alert %}}
+
+### 8.6.2 Configuration properties
+
+| Property                                | Type                | Description                                                         |
+|-----------------------------------------|-------------------- |---------------------------------------------------------------------|
+|  `monitoring.streams.interceptor.enable`           | boolean  | If `true`, enable and configure the interceptor |
+|  `monitoring.streams.interceptor.interval.ms`      | long     | The period the interceptor should use to send a streams state event (Default is 10 seconds).
+|  `monitoring.streams.interceptor.topic`            | string   | The topic on which monitoring event will be sent (Default is _azkarra-streams-monitoring). |
+| `monitoring.streams.interceptor.advertised.server` | string   | The server name that will be included in monitoring events. If not specified, the streams `application.server` property is used. |
+| `monitoring.streams.interceptor.ce.extensions`     | list     | The list of extension attributes that should be included in monitoring events. |

@@ -1,5 +1,5 @@
 ---
-date: 2020-02-12
+date: 2020-05-09
 title: "Dependency Injection"
 linkTitle: "Dependency Injection"
 weight: 6
@@ -206,7 +206,7 @@ Another way to provide a component is to directly annotated a class implementing
 
 ```java
 @Component
-@Bean("simpleStopWordsService")
+@Named("simpleStopWordsService")
 public class StopWordsServiceSupplier implements Supplier<StopWordsService>, Configurable {
     
     private Conf conf;
